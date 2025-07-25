@@ -1,6 +1,9 @@
 const API = 'https://hacker-news.firebaseio.com/v0';
-let postIDs = [];
-let currentIndex = 0;
+let storyIDs = [];
+let jobIDs = [];
+let storyIndex = 0;
+let jobIndex = 0;
+let postCache = [];
 let loadedPosts = [];
 let newPostIDs = [];
 
@@ -14,30 +17,40 @@ async function fetchJSON(url) {
 }
 
 async function loadInitialPosts() {
-  postIDs = await fetchJSON(`${API}/newstories.json`);
+  storyIDs = await fetchJSON(`${API}/newstories.json`);
+  jobIDs = await fetchJSON(`${API}/jobstories.json`);
+  await fillPostCache();
   loadNextPosts();
   setInterval(checkForUpdates, 5000);
 }
 
+async function fillPostCache() {
+  const chunkSize = 20;
+  const storyChunk = storyIDs.slice(storyIndex, storyIndex + chunkSize);
+  const jobChunk = jobIDs.slice(jobIndex, jobIndex + chunkSize);
+  storyIndex += chunkSize;
+  jobIndex += chunkSize;
+  const posts = await Promise.all([...storyChunk, ...jobChunk].map(id => fetchJSON(`${API}/item/${id}.json`)));
+  postCache = postCache.concat(posts.filter(p => p));
+  postCache.sort((a, b) => b.time - a.time);
+}
+
 async function loadNextPosts() {
-  const nextIDs = postIDs.slice(currentIndex, currentIndex + 10);
-  const posts = await Promise.all(nextIDs.map(id => fetchJSON(`${API}/item/${id}.json`)));
-
-  posts.forEach(post => {
-    if (post) {
-      loadedPosts.push(post.id);
-      postsContainer.appendChild(createPostElement(post));
-    }
+  if (postCache.length < 10 && (storyIndex < storyIDs.length || jobIndex < jobIDs.length)) {
+    await fillPostCache();
+  }
+  const nextPosts = postCache.splice(0, 10);
+  nextPosts.forEach(post => {
+    loadedPosts.push(post.id);
+    postsContainer.appendChild(createPostElement(post));
   });
-
-  currentIndex += 10;
 }
 
 function createPostElement(post) {
   const el = document.createElement('div');
   el.className = 'post';
   el.innerHTML = `
-    <h3>${post.title || '[No title]'}</h3>
+    <h3>${post.title || '[No title]'} <small>(${post.type})</small></h3>
     <p>by ${post.by} | ${new Date(post.time * 1000).toLocaleString()}</p>
     ${post.url ? `<a href="${post.url}" target="_blank">Read more</a>` : ''}
     ${post.text ? `<p>${post.text}</p>` : ''}
@@ -88,23 +101,28 @@ function renderComment(comment, container, level = 0) {
 }
 
 async function checkForUpdates() {
-  const latestIDs = await fetchJSON(`${API}/newstories.json`);
-  const newIDs = latestIDs.filter(id => !loadedPosts.includes(id));
-  if (newIDs.length > 0) {
-    newPostIDs = newIDs;
+  const [latestStoryIDs, latestJobIDs] = await Promise.all([
+    fetchJSON(`${API}/newstories.json`),
+    fetchJSON(`${API}/jobstories.json`)
+  ]);
+  const latestIDs = [...latestStoryIDs, ...latestJobIDs];
+  const fresh = latestIDs.filter(id => !loadedPosts.includes(id) && !newPostIDs.includes(id));
+  if (fresh.length > 0) {
+    newPostIDs = fresh;
     liveUpdateBar.classList.remove('hidden');
   }
 }
 
 async function showNewPosts() {
-  const posts = await Promise.all(newPostIDs.slice(0, 10).map(id => fetchJSON(`${API}/item/${id}.json`)));
-  posts.reverse().forEach(post => {
-    if (post) {
+  const items = await Promise.all(newPostIDs.slice(0, 10).map(id => fetchJSON(`${API}/item/${id}.json`)));
+  items
+    .filter(p => p)
+    .sort((a, b) => b.time - a.time)
+    .forEach(post => {
       loadedPosts.unshift(post.id);
       const postEl = createPostElement(post);
       postsContainer.prepend(postEl);
-    }
-  });
+    });
   newPostIDs = [];
   liveUpdateBar.classList.add('hidden');
 }
