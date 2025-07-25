@@ -1,21 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>HackerNews UI</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <header>
-    <h1>🚀 HackerNews Live Feed</h1>
-    <div id="live-update-bar" class="hidden">🔄 New posts available! <button onclick="showNewPosts()">Show</button></div>
-  </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hacker News UI</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <span>📰</span>
+          <span>Hacker News</span>
+        </div>
+        <div class="live-indicator">
+          <div class="pulse"></div>
+          <span>Live Updates</span>
+          <span id="last-update">Just now</span>
+        </div>
+      </div>
+    </header>
 
-  <main id="posts-container"></main>
+    <div class="container">
+      <nav class="nav-tabs">
+        <button class="tab active" data-category="topstories">
+          Top Stories
+        </button>
+        <button class="tab" data-category="newstories">New</button>
+        <button class="tab" data-category="beststories">Best</button>
+        <button class="tab" data-category="askstories">Ask HN</button>
+        <button class="tab" data-category="showstories">Show HN</button>
+        <button class="tab" data-category="jobstories">Jobs</button>
+      </nav>
 
-  <button id="load-more">Load More</button>
+      <main class="main-content">
+        <div class="loading" id="main-loading">
+          <div class="spinner"></div>
+          <span>Loading posts...</span>
+        </div>
 
-  <script src="app.js"></script>
-</body>
+        <div class="posts-container" id="posts-container"></div>
+
+        <button class="load-more" id="load-more" style="display: none">
+          <span class="load-more-text">Load More</span>
+          <div class="spinner small" style="display: none"></div>
+        </button>
+      </main>
+
+      <aside class="sidebar">
+        <div class="live-updates-section">
+          <h3>🔴 Live Updates</h3>
+          <div class="live-updates" id="live-updates">
+            <div class="no-updates">Checking for updates...</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Post Modal -->
+    <div class="modal-overlay" id="modal-overlay" style="display: none">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 id="modal-title"></h2>
+          <button class="close-btn" id="close-modal">&times;</button>
+        </div>
+        <div class="modal-content">
+          <div class="post-meta" id="modal-meta"></div>
+          <div class="post-content" id="modal-content"></div>
+          <div class="comments-section">
+            <h3>Comments</h3>
+            <div class="comments-loading">
+              <div class="spinner small"></div>
+              <span>Loading comments...</span>
+            </div>
+            <div class="comments-container" id="comments-container"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
 </html>
