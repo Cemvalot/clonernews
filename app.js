@@ -1,8 +1,10 @@
 const API = 'https://hacker-news.firebaseio.com/v0';
 let storyIDs = [];
 let jobIDs = [];
+let pollIDs = [];
 let storyIndex = 0;
 let jobIndex = 0;
+let pollIndex = 0;
 let postCache = [];
 let loadedPosts = [];
 let newPostIDs = [];
@@ -19,6 +21,7 @@ async function fetchJSON(url) {
 async function loadInitialPosts() {
   storyIDs = await fetchJSON(`${API}/newstories.json`);
   jobIDs = await fetchJSON(`${API}/jobstories.json`);
+  pollIDs = await fetchJSON(`${API}/polls.json`);
   await fillPostCache();
   loadNextPosts();
   setInterval(checkForUpdates, 5000);
@@ -28,15 +31,20 @@ async function fillPostCache() {
   const chunkSize = 20;
   const storyChunk = storyIDs.slice(storyIndex, storyIndex + chunkSize);
   const jobChunk = jobIDs.slice(jobIndex, jobIndex + chunkSize);
+  const pollChunk = pollIDs.slice(pollIndex, pollIndex + chunkSize);
   storyIndex += chunkSize;
   jobIndex += chunkSize;
-  const posts = await Promise.all([...storyChunk, ...jobChunk].map(id => fetchJSON(`${API}/item/${id}.json`)));
+  pollIndex += chunkSize;
+  const posts = await Promise.all([...storyChunk, ...jobChunk, ...pollChunk].map(id => fetchJSON(`${API}/item/${id}.json`)));
   postCache = postCache.concat(posts.filter(p => p));
   postCache.sort((a, b) => b.time - a.time);
 }
 
 async function loadNextPosts() {
-  if (postCache.length < 10 && (storyIndex < storyIDs.length || jobIndex < jobIDs.length)) {
+  if (
+    postCache.length < 10 &&
+    (storyIndex < storyIDs.length || jobIndex < jobIDs.length || pollIndex < pollIDs.length)
+  ) {
     await fillPostCache();
   }
   const nextPosts = postCache.splice(0, 10);
@@ -54,9 +62,22 @@ function createPostElement(post) {
     <p>by ${post.by} | ${new Date(post.time * 1000).toLocaleString()}</p>
     ${post.url ? `<a href="${post.url}" target="_blank">Read more</a>` : ''}
     ${post.text ? `<p>${post.text}</p>` : ''}
+    ${post.type === 'poll' ? `<ul class="poll-options" id="poll-${post.id}"></ul>` : ''}
     <button onclick="toggleComments(${post.id}, this)">💬 Show Comments</button>
     <div class="comments" id="comments-${post.id}"></div>
   `;
+
+  if (post.type === 'poll' && post.parts) {
+    const list = el.querySelector(`#poll-${post.id}`);
+    post.parts.forEach(async id => {
+      const opt = await fetchJSON(`${API}/item/${id}.json`);
+      if (opt) {
+        const li = document.createElement('li');
+        li.textContent = `${opt.text} (${opt.score})`;
+        list.appendChild(li);
+      }
+    });
+  }
   return el;
 }
 
@@ -101,11 +122,12 @@ function renderComment(comment, container, level = 0) {
 }
 
 async function checkForUpdates() {
-  const [latestStoryIDs, latestJobIDs] = await Promise.all([
+  const [latestStoryIDs, latestJobIDs, latestPollIDs] = await Promise.all([
     fetchJSON(`${API}/newstories.json`),
-    fetchJSON(`${API}/jobstories.json`)
+    fetchJSON(`${API}/jobstories.json`),
+    fetchJSON(`${API}/polls.json`)
   ]);
-  const latestIDs = [...latestStoryIDs, ...latestJobIDs];
+  const latestIDs = [...latestStoryIDs, ...latestJobIDs, ...latestPollIDs];
   const fresh = latestIDs.filter(id => !loadedPosts.includes(id) && !newPostIDs.includes(id));
   if (fresh.length > 0) {
     newPostIDs = fresh;
